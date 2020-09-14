@@ -36,7 +36,7 @@ import (
 	"time"
 
 	secretmanager "cloud.google.com/go/secretmanager/apiv1"
-	privateca "cloud.google.com/go/security/privateca/apiv1alpha1"
+	privateca "cloud.google.com/go/security/privateca/apiv1beta1"
 	"github.com/golang/protobuf/ptypes"
 	secretmanagerpb "google.golang.org/genproto/googleapis/cloud/secretmanager/v1"
 
@@ -49,7 +49,7 @@ import (
 	"golang.org/x/time/rate"
 	"google.golang.org/api/iterator"
 
-	privatecapb "google.golang.org/genproto/googleapis/cloud/security/privateca/v1alpha1"
+	privatecapb "google.golang.org/genproto/googleapis/cloud/security/privateca/v1beta1"
 )
 
 type ErrorResult struct {
@@ -117,7 +117,7 @@ func genResponses(ctx context.Context, sn string) (res []ErrorResult) {
 		crt, err := it.Next()
 		if err == iterator.Done {
 			break
-		}		
+		}
 		if err != nil {
 			log.Printf("Unable to get  certificates: %v", err)
 			mu.Lock()
@@ -149,9 +149,9 @@ func genResponses(ctx context.Context, sn string) (res []ErrorResult) {
 			if !ok {
 				mu.Lock()
 				aggregatedErrors = append(aggregatedErrors, ErrorResult{
-					SerialNumber: sn, 
-					Message: "Could not read HexSerialNumber for revoked certificate", 
-					Error: errors.New(fmt.Sprintf("Could not read HexSerialNumber for revoked certificate %v",sn)),
+					SerialNumber: sn,
+					Message:      "Could not read HexSerialNumber for revoked certificate",
+					Error:        errors.New(fmt.Sprintf("Could not read HexSerialNumber for revoked certificate %v", sn)),
 				})
 				mu.Unlock()
 				return
