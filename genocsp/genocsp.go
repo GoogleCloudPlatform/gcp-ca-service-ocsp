@@ -36,7 +36,10 @@ import (
 	"time"
 
 	secretmanager "cloud.google.com/go/secretmanager/apiv1"
-	privateca "cloud.google.com/go/security/privateca/apiv1beta1"
+
+	privateca "cloud.google.com/go/security/privateca/apiv1"
+	privatecapb "google.golang.org/genproto/googleapis/cloud/security/privateca/v1"
+
 	"github.com/golang/protobuf/ptypes"
 	secretmanagerpb "google.golang.org/genproto/googleapis/cloud/secretmanager/v1"
 
@@ -48,8 +51,6 @@ import (
 	"golang.org/x/net/http2"
 	"golang.org/x/time/rate"
 	"google.golang.org/api/iterator"
-
-	privatecapb "google.golang.org/genproto/googleapis/cloud/security/privateca/v1beta1"
 )
 
 type ErrorResult struct {
@@ -71,6 +72,7 @@ var (
 	projectID = flag.String("projectID", "", "ProjectID for PrivateCA")
 	location  = flag.String("location", "", "Location for PrivateCA")
 	caName    = flag.String("ca_name", "", "Name of CA")
+	caPool    = flag.String("pool", "", "Name of CA Pool")
 
 	bucketName    = flag.String("bucketName", "", "OCSP Response BUcket")
 	ocspSignerKey = flag.String("ocsp_signer_key", "ocsp_signer_key.pem", "OCSP Signer PrivateKey")
@@ -93,8 +95,8 @@ func genResponses(ctx context.Context, sn string) (res []ErrorResult) {
 
 	var aggregatedErrors []ErrorResult // Saves any errors from each certificate ocsp response.  TODO: use channels
 
-	// Start iterating over all the certificates in the CA
-	parent := fmt.Sprintf("projects/%s/locations/%s/certificateAuthorities/%s", *projectID, *location, *caName)
+	// Start iterating over all the certificates in the CAPool
+	parent := fmt.Sprintf("projects/%s/locations/%s/caPools/%s", *projectID, *location, *caPool)
 
 	// 6/15/20: Filtering by time based attribute like updateTime is not yet supported in the API.
 	//          Once it is ready, the filter below can be used to shard generation and/or update using attributes like updateTime
@@ -263,9 +265,9 @@ func main() {
 	flag.Parse()
 	var err error
 
-	if *bucketName == "" || *caName == "" || *location == "" || *projectID == "" ||
+	if *bucketName == "" || *caName == "" || *caPool == "" || *location == "" || *projectID == "" ||
 		*ocspSignerKey == "" || *ocspSignerCrt == "" {
-		log.Fatalf("bucketName, caName, location, projectID, ocspSignerKey, ocspSignerCrt cannot be null")
+		log.Fatalf("bucketName, caName, caPool, location, projectID, ocspSignerKey, ocspSignerCrt cannot be null")
 	}
 
 	ctx := context.Background()

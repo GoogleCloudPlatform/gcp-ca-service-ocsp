@@ -30,18 +30,18 @@ First setup environment variables
 export PROJECT_ID=`gcloud config get-value core/project`
 export PROJECT_NUMBER=`gcloud projects describe $PROJECT_ID --format="value(projectNumber)"`
 export REGION=us-central1
+export CAPOOL=my-pool
+export CA_NAME=my-ca
 ```
 
-It is assumed you already have a RootCA configured. In the example below, the CA to use is called `prod-root`.
+It is assumed you already have a RootCA configured. In the example below, the CA to use is called `my-ca`.
 
 The server component will serve an OCSP response from GCS after validating the inbound request to the server is an OCSP Request itself.  Though not implemented currently, the server could validate the Request is the CA it handles requests for.
 
 ```bash
-export CA_NAME=prod-root
-
-$ gcloud alpha privateca roots list
-NAME       LOCATION     STATE    NOT_BEFORE         NOT_AFTER
-prod-root  us-central1  ENABLED  2020-04-22T00:18Z  2030-04-22T10:26Z
+$ gcloud privateca roots list
+NAME   LOCATION     POOL     STATE    NOT_BEFORE         NOT_AFTER
+my-ca  us-central1  my-pool  ENABLED  2021-05-23T15:10Z  2021-05-24T18:56Z
 ```
 
 ### OCSP Generator
@@ -75,7 +75,7 @@ Create a `ocsp-role-definition.yaml` file below (remember to replace `$PROJECT_I
 includedPermissions:
 - privateca.certificates.list
 - privateca.certificates.get
-name: projects/$PROJECT_ID/roles/OCSPGeneratorRole
+name: projects/$PROJECT_ID/roles/ocspResponderRole
 stage: GA
 title: OCSP Generator
 ```
@@ -84,21 +84,21 @@ Create the Custom Role
 
 ```bash
 gcloud iam roles create ocspResponderRole --project=$PROJECT_ID \
-  --file=ocsp-custom-role.yaml
+  --file=ocsp-role-definition.yaml
 ```
 
 Then apply the custom role
 
 ```bash
-gcloud alpha privateca roots add-iam-policy-binding $CA_NAME \
+gcloud privateca pools add-iam-policy-binding $CAPOOL \
   --location $REGION \
-  --member "serviceAccount:$OCSP_GENERATOR_SERVICE_ACCOUNT" --role "projects/$PROJECT_ID/roles/OCSPGeneratorRole"
+  --member "serviceAccount:$OCSP_GENERATOR_SERVICE_ACCOUNT" --role "projects/$PROJECT_ID/roles/ocspResponderRole"
 ```
 
 Alternatively, instead of a custom role, you can assign the pre-defined  `roles/privateca.auditor` role though that has additional read-only permissions that allow get/list IAM policies
 
 ```bash
-gcloud alpha privateca roots add-iam-policy-binding $CA_NAME \
+gcloud privateca pools add-iam-policy-binding $CAPOOL \
   --location $REGION \
   --member "serviceAccount:$OCSP_GENERATOR_SERVICE_ACCOUNT" --role "roles/privateca.auditor"
 ```
@@ -106,20 +106,20 @@ gcloud alpha privateca roots add-iam-policy-binding $CA_NAME \
 #### Acquire the RootCA Certificate
 
 ```bash
-gcloud alpha privateca roots describe \
-  $CA_NAME \
-  --location $REGION \
-  --project $PROJECT_ID \
-  --format="value(pemCert)" > rootca.crt
+
+gcloud  privateca roots describe   $CA_NAME \
+ --pool $CAPOOL --location $REGION  \
+ --project $PROJECT_ID   --format="value(pemCaCertificates)" > rootca.crt
 ```
 
 #### Generate the KeyPair that allows for OCSP Signing
 
 ```bash
-gcloud alpha privateca certificates create --issuer $CA_NAME \
-  --issuer-location $REGION  --generate-key  --key-output-file ocsp_signer_key.pem  \
-  --cert-output-file ocsp_signer_crt.pem --subject "CN=ocsp_signer"  \
-  --extended-key-usages="ocsp_signing"
+gcloud privateca certificates create \
+--pool $CAPOOL --ca $CA_NAME --location $LOCATION \
+--generate-key --key-output-file ocsp_signer_crt.pem \
+--subject "CN=ocsp_signer" \
+--use-preset-profile ocsp_signing
 ```
 
 >> Be *very careful* with the certificate: this is what signs the OCSP Responses
@@ -135,6 +135,7 @@ go run genocsp/genocsp.go \
   --projectID=$PROJECT_ID \
   --location=$REGION \
   --ca_name=$CA_NAME \
+  --pool=$CAPOOL \
   --ocsp_signer_key=ocsp_signer_key.pem \
   --ocsp_signer_crt=ocsp_signer_crt.pem \
   --bucketName=$OCSP_BUCKET \
