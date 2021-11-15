@@ -116,10 +116,11 @@ gcloud  privateca roots describe   $CA_NAME \
 
 ```bash
 gcloud privateca certificates create \
---pool $CAPOOL --ca $CA_NAME --location $LOCATION \
---generate-key --key-output-file ocsp_signer_crt.pem \
---subject "CN=ocsp_signer" \
---use-preset-profile ocsp_signing
+ --issuer-pool $CAPOOL --ca $CA_NAME --issuer-location $REGION \
+ --generate-key --key-output-file ocsp_signer_key.pem \
+ --cert-output-file  ocsp_signer_crt.pem \
+ --subject "CN=ocsp_signer" \
+ --extended-key-usages ocsp_signing
 ```
 
 >> Be *very careful* with the certificate: this is what signs the OCSP Responses
